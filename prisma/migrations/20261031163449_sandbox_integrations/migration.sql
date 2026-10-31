@@ -1,0 +1,1 @@
+-- This is an empty migration.ALTER TABLE "public"."Refund" ADD CONSTRAINT "refund_amount_positive" CHECK ("amountHalalas" > 0);

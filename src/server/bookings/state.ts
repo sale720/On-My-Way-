@@ -24,8 +24,9 @@ export const TRANSITIONS: Partial<Record<BookingStatus, Rule[]>> = {
     { to: "REJECTED", by: ["provider", "salon"], reasonRequired: true },
     { to: "CANCELLED", by: ["customer", "salon", "platform", "system"] },
   ],
+  // Online payment first; once the gateway reports PAID the request goes to the provider.
   PENDING_PAYMENT: [
-    { to: "CONFIRMED", by: ["system"] },
+    { to: "PENDING_PROVIDER_ACCEPTANCE", by: ["system"] },
     { to: "CANCELLED", by: ["customer", "platform", "system"] },
   ],
   CONFIRMED: [

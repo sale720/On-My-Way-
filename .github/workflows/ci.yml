@@ -32,6 +32,7 @@ jobs:
           DATABASE_URL="postgresql://omw:omw_ci_only@localhost:5432/omw_test?schema=public"
           AUTH_SECRET="ci-only-secret-0123456789abcdef0123456789"
           SMS_PROVIDER=memory
+          PAYMENT_MODE=sandbox
           ENV
       - run: npm ci
       - run: npx prisma generate

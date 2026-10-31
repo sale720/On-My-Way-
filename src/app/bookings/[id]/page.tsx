@@ -4,7 +4,7 @@ import { isAppError } from "@/server/errors";
 import { getCurrentUser, getDict2, getLocale } from "@/server/web";
 import { ActionForm } from "../../_components/ActionForm";
 import { fmtDateTime, formatSar } from "../../_components/format";
-import { recordCashAction, reviewAction, transitionAction } from "../../actions2";
+import { recordCashAction, reviewAction, startCheckoutAction, transitionAction } from "../../actions2";
 
 export default async function BookingPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -83,10 +83,27 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         <div className="font-bold">
           {t.book.total}: {formatSar(b.totalHalalas, locale)}
         </div>
-        <div data-testid="payment">
+        <div data-testid="payment" data-payment-status={b.paymentStatus}>
           {t.booking.payment}: {t.pay[b.paymentMethod]} — {t.payStatus[b.paymentStatus]}
         </div>
+        {b.payments.some((p) => p.provider === "sandbox") && <div className="muted text-xs">{t.booking.sandboxPayment}</div>}
+        {b.payments.flatMap((p) => p.refunds).map((r) => (
+          <div key={r.id} data-testid="refund" data-refund-status={r.status}>
+            {t.booking.refund}: {formatSar(r.amountHalalas, locale)} — {t.booking.refundStatus[r.status]}
+          </div>
+        ))}
       </div>
+
+      {b.canPay && (
+        <ActionForm action={startCheckoutAction} submitLabel={t.booking.payNow} className="card flex flex-wrap items-center gap-2" testId="pay-now">
+          <input type="hidden" name="bookingId" value={b.id} />
+          {b.acceptBy && (
+            <span className="text-sm">
+              {t.booking.payDue} {fmtDateTime(b.acceptBy, locale)}
+            </span>
+          )}
+        </ActionForm>
+      )}
 
       {(b.nextActions.length > 0 || b.canRecordCash) && (
         <div className="card flex flex-col gap-2" data-testid="actions">

@@ -58,7 +58,7 @@ export default async function AdminSettingsPage() {
                   <td>{t.payState[m.state]}</td>
                   <td className="muted">{m.requires ? t.payRequires[m.requires] : "—"}</td>
                   <td>
-                    {m.integrated && (
+                    {m.mode !== "NONE" && (
                       <ActionForm action={platformPaymentMethodAction} submitLabel={m.platformEnabled ? t.common.disable : t.common.enable}>
                         <input type="hidden" name="method" value={m.method} />
                         <input type="hidden" name="enabled" value={m.platformEnabled ? "false" : "true"} />

@@ -7,6 +7,7 @@ import { createAddress, createCity, createDistrict, deleteAddress, setStaffCover
 import { createCategory, createSalonService, setCategoryActive, setStaffSkills, updateSalonService } from "@/server/catalog/service";
 import { addException, removeException, setWeeklyRules } from "@/server/availability/service";
 import { createBooking, recordCashPayment, transitionBooking } from "@/server/bookings/service";
+import { simulateSandboxPayment, startCheckout } from "@/server/payments/checkout";
 import { createReview } from "@/server/reviews/service";
 import { markAllRead } from "@/server/notifications/service";
 import { setPlatformPaymentMethod, setSalonPaymentMethod } from "@/server/payments/service";
@@ -41,18 +42,44 @@ export async function deleteAddressAction(_: ActionState, fd: FormData): Promise
 }
 
 export async function createBookingAction(_: ActionState, fd: FormData): Promise<ActionState> {
-  let id = "";
+  let target = "";
   const res = await runAction(async () => {
-    const b = await createBooking(await getCurrentUser(), {
+    const user = await getCurrentUser();
+    const b = await createBooking(user, {
       salonServiceId: str(fd, "salonServiceId"),
       addressId: str(fd, "addressId"),
       startsAt: str(fd, "startsAt"),
       paymentMethod: str(fd, "paymentMethod"),
       notes: str(fd, "notes"),
     });
-    id = b.id;
+    // Online methods continue to the (sandbox) hosted checkout; cash goes straight to the booking.
+    target = b.status === "PENDING_PAYMENT" ? await startCheckout(user, b.id) : `/bookings/${b.id}`;
   });
-  if (res?.ok) redirect(`/bookings/${id}`);
+  if (res?.ok) redirect(target);
+  return res;
+}
+
+export async function startCheckoutAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  let target = "";
+  const res = await runAction(async () => {
+    target = await startCheckout(await getCurrentUser(), str(fd, "bookingId"));
+  });
+  if (res?.ok) redirect(target);
+  return res;
+}
+
+export async function sandboxPayAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  let bookingId = "";
+  const res = await runAction(async () => {
+    const user = await getCurrentUser();
+    const ref = str(fd, "providerRef");
+    await simulateSandboxPayment(user, ref, {
+      outcome: str(fd, "outcome") === "decline" ? "decline" : "approve",
+      cardNumber: str(fd, "cardNumber") || undefined,
+    });
+    bookingId = str(fd, "bookingId");
+  });
+  if (res?.ok) redirect(`/bookings/${bookingId}`);
   return res;
 }
 

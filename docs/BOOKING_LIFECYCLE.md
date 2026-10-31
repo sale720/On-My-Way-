@@ -11,7 +11,7 @@
               └► CANCELLED                └► CANCELLED (سبب، ضمن سياسة الإلغاء للعميلة)
                  (عميلة/منشأة/منصة/نظام: انتهاء مهلة القبول)
 ```
-`PENDING_PAYMENT → CONFIRMED/CANCELLED` مُعرّفة للدفع الإلكتروني لاحقاً. `DRAFT` و`PENDING_AVAILABILITY_CHECK` و`ASSIGNED` محجوزة في المخطط دون انتقالات بعد.
+**الدفع الإلكتروني (D-018):** `PENDING_PAYMENT` (الموعد محجوز خلال نافذة الدفع) ← `PENDING_PROVIDER_ACCEPTANCE` بعد الدفع (نظام) أو `CANCELLED` (فشل الدفع / انتهاء المهلة / إلغاء العميلة). أي إلغاء أو رفض بعد الدفع يُطلق **استرداداً تلقائياً**. `DRAFT` و`PENDING_AVAILABILITY_CHECK` و`ASSIGNED` محجوزة في المخطط دون انتقالات بعد.
 
 ## من يحق له ماذا (Capacities)
 | الصفة | التعريف |

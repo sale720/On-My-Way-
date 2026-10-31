@@ -12,6 +12,7 @@ import { parse, reasonSchema } from "../validation";
 export const SETTING_DEFS = {
   commissionBps: { schema: z.coerce.number().int().min(0).max(10_000), default: 0 }, // basis points of the service subtotal
   vatBps: { schema: z.coerce.number().int().min(0).max(10_000), default: 0 }, // basis points applied to subtotal + travel fee
+  paymentWindowMinutes: { schema: z.coerce.number().int().min(5).max(120), default: 15 }, // time to complete online payment
 } as const;
 
 export type SettingKey = keyof typeof SETTING_DEFS;

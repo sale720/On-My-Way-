@@ -10,7 +10,9 @@ import { salonRoleHas } from "../rbac/permissions";
 import { ownedAddress } from "../geo/service";
 import { computeQuote } from "../pricing/quote";
 import { getSettings } from "../settings/service";
-import { salonPaymentMethodStatuses } from "../payments/service";
+import { isSelectable, salonPaymentMethodStatuses } from "../payments/service";
+import { isOnline } from "../payments/methods";
+import { refundBookingPayment } from "../payments/checkout";
 import { notify } from "../notifications/service";
 import { riyadhDate } from "../time";
 import { parse } from "../validation";
@@ -35,26 +37,35 @@ async function salonManagersAndStaff(tx: Db, salonId: string, staffMembershipId:
 }
 
 /** Pending requests the provider did not answer in time are cancelled automatically (lazy; also callable by a scheduler). */
+/**
+ * Pending steps that ran out of time are cancelled automatically (lazy; also callable by a scheduler):
+ *   PENDING_PAYMENT             → CANCELLED "payment_timeout"     (payment window passed)
+ *   PENDING_PROVIDER_ACCEPTANCE → CANCELLED "acceptance_timeout"  (provider did not answer) — a paid online payment is refunded
+ */
 export async function expireStalePendingBookings(now = new Date()) {
   const stale = await db.booking.findMany({
-    where: { status: "PENDING_PROVIDER_ACCEPTANCE", acceptBy: { lt: now } },
-    select: { id: true, customerId: true, number: true },
+    where: { status: { in: ["PENDING_PROVIDER_ACCEPTANCE", "PENDING_PAYMENT"] }, acceptBy: { lt: now } },
+    select: { id: true, customerId: true, number: true, status: true, paymentStatus: true },
     take: 200,
   });
+  const toRefund: string[] = [];
   for (const b of stale) {
-    await db.$transaction(async (tx) => {
+    const reason = b.status === "PENDING_PAYMENT" ? "payment_timeout" : "acceptance_timeout";
+    const paid = b.paymentStatus === "PAID" || b.paymentStatus === "AUTHORIZED";
+    const done = await db.$transaction(async (tx) => {
       const r = await tx.booking.updateMany({
-        where: { id: b.id, status: "PENDING_PROVIDER_ACCEPTANCE" },
-        data: { status: "CANCELLED", cancelReason: "acceptance_timeout", paymentStatus: "VOIDED" },
+        where: { id: b.id, status: b.status },
+        data: { status: "CANCELLED", cancelReason: reason, ...(paid ? {} : { paymentStatus: "VOIDED" }) },
       });
-      if (r.count === 0) return;
+      if (r.count === 0) return false;
       await tx.payment.updateMany({ where: { bookingId: b.id, status: "PENDING" }, data: { status: "VOIDED" } });
-      await tx.bookingStatusHistory.create({
-        data: { bookingId: b.id, from: "PENDING_PROVIDER_ACCEPTANCE", to: "CANCELLED", actorId: null, reason: "acceptance_timeout" },
-      });
+      await tx.bookingStatusHistory.create({ data: { bookingId: b.id, from: b.status, to: "CANCELLED", actorId: null, reason } });
       await notify(tx, [b.customerId], "booking.expired", { bookingId: b.id, number: b.number });
+      return true;
     });
+    if (done && paid) toRefund.push(b.id);
   }
+  for (const id of toRefund) await refundBookingPayment(id, "acceptance_timeout");
   return stale.length;
 }
 
@@ -97,7 +108,7 @@ export async function createBooking(actor: Actor | null, input: Record<string, u
   if (!ev.eligible) throw new AppError("NOT_ELIGIBLE", ev.reason);
 
   const method = (await salonPaymentMethodStatuses(ev.salon.id)).find((m) => m.method === d.paymentMethod)!;
-  if (method.state !== "AVAILABLE") throw new AppError("PAYMENT_METHOD_UNAVAILABLE", method.state);
+  if (!isSelectable(method.state)) throw new AppError("PAYMENT_METHOD_UNAVAILABLE", method.state);
 
   // The requested start must be one of the computed free slots for at least one eligible provider.
   const date = riyadhDate(d.startsAt);
@@ -115,8 +126,11 @@ export async function createBooking(actor: Actor | null, input: Record<string, u
   const startsAt = d.startsAt;
   const endsAt = new Date(startsAt.getTime() + ev.service.durationMinutes * 60_000);
   const blockedFrom = new Date(startsAt.getTime() - ev.salon.travelBufferMinutes * 60_000);
-  const acceptBy = new Date(Math.min(now.getTime() + ev.salon.acceptanceTimeoutMinutes * 60_000, startsAt.getTime()));
-  const status: BookingStatus = "PENDING_PROVIDER_ACCEPTANCE";
+  // Online methods: the slot is held while the customer pays; the provider is asked only after payment.
+  const online = isOnline(d.paymentMethod as PaymentMethod);
+  const status: BookingStatus = online ? "PENDING_PAYMENT" : "PENDING_PROVIDER_ACCEPTANCE";
+  const windowMinutes = online ? settings.paymentWindowMinutes : ev.salon.acceptanceTimeoutMinutes;
+  const acceptBy = new Date(Math.min(now.getTime() + windowMinutes * 60_000, startsAt.getTime()));
 
   for (const staffMembershipId of candidates) {
     try {
@@ -168,10 +182,12 @@ export async function createBooking(actor: Actor | null, input: Record<string, u
             history: { create: { from: null, to: status, actorId: a.id } },
           },
         });
-        await notify(tx, await salonManagersAndStaff(tx, ev.salon.id, staffMembershipId), "booking.requested", {
-          bookingId: booking.id,
-          number: booking.number,
-        });
+        if (!online) {
+          await notify(tx, await salonManagersAndStaff(tx, ev.salon.id, staffMembershipId), "booking.requested", {
+            bookingId: booking.id,
+            number: booking.number,
+          });
+        }
         return booking;
       });
     } catch (e) {
@@ -209,7 +225,7 @@ export async function getBooking(actor: Actor | null, bookingId: string) {
     where: { id: bookingId },
     include: {
       items: true,
-      payments: true,
+      payments: { include: { refunds: true } },
       history: { orderBy: { createdAt: "asc" } },
       review: true,
       salon: { select: { id: true, name: true } },
@@ -234,6 +250,7 @@ export async function getBooking(actor: Actor | null, bookingId: string) {
     capacities: caps,
     nextActions: allowedNext(b.status, caps).map((r) => ({ to: r.to, reasonRequired: !!r.reasonRequired })),
     canReview: caps.includes("customer") && b.status === "COMPLETED" && !b.review,
+    canPay: caps.includes("customer") && b.status === "PENDING_PAYMENT",
     canRecordCash:
       (caps.includes("provider") || caps.includes("salon")) &&
       b.paymentMethod === "CASH" &&
@@ -245,7 +262,7 @@ export async function getBooking(actor: Actor | null, bookingId: string) {
 export async function transitionBooking(actor: Actor | null, bookingId: string, to: BookingStatus, reason?: string, now = new Date()) {
   if (!actor) throw new AppError("UNAUTHENTICATED");
   const why = reason?.trim() || null;
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     const b = await tx.booking.findUnique({ where: { id: bookingId } });
     if (!b || !(await canRead(tx, actor, b))) throw new AppError("NOT_FOUND");
     const caps = await capacitiesFor(tx, actor, b);
@@ -287,8 +304,12 @@ export async function transitionBooking(actor: Actor | null, bookingId: string, 
       });
     }
     logger.info("booking.transition", { bookingId: b.id, from: b.status, to, as: actingAs });
-    return { from: b.status, to };
+    const paidOnline = (b.paymentStatus === "PAID" || b.paymentStatus === "AUTHORIZED") && isOnline(b.paymentMethod);
+    return { from: b.status, to, refund: paidOnline && (to === "CANCELLED" || to === "REJECTED") };
   });
+  // Money is returned after the status change has committed (never inside the DB transaction).
+  if (result.refund) await refundBookingPayment(bookingId, `booking_${to.toLowerCase()}`);
+  return { from: result.from, to: result.to };
 }
 
 /** Provider/salon confirms that the customer paid cash for a booking being or already served. */

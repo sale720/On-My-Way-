@@ -1,3 +1,4 @@
+import { db } from "../db";
 import { env } from "../env";
 import { logger } from "../logger";
 
@@ -27,12 +28,39 @@ export class MemorySmsProvider implements SmsProvider {
   }
 }
 
+/**
+ * Sandbox: stores the message in the database so it can be read in the in-app test inbox (/dev/sms).
+ * Nothing is delivered to any phone. Refused in production by env validation.
+ */
+export class SandboxSmsProvider implements SmsProvider {
+  readonly name = "sandbox";
+  async send(to: string, body: string) {
+    await db.smsMessage.create({ data: { provider: this.name, to, body } });
+  }
+}
+
+/** Sandbox inbox is readable only when the sandbox provider is active outside production. */
+export function sandboxInboxEnabled() {
+  const e = env();
+  return e.APP_ENV !== "production" && e.SMS_PROVIDER === "sandbox";
+}
+
+export async function listSandboxSms(phone?: string, take = 30) {
+  if (!sandboxInboxEnabled()) return null;
+  return db.smsMessage.findMany({
+    where: phone ? { to: phone } : undefined,
+    orderBy: { createdAt: "desc" },
+    take,
+  });
+}
+
 const g = globalThis as unknown as { smsProvider?: SmsProvider };
 
 export function smsProvider(): SmsProvider {
   if (g.smsProvider) return g.smsProvider;
   const kind = env().SMS_PROVIDER;
-  g.smsProvider = kind === "memory" ? new MemorySmsProvider() : new ConsoleSmsProvider();
+  g.smsProvider =
+    kind === "memory" ? new MemorySmsProvider() : kind === "sandbox" ? new SandboxSmsProvider() : new ConsoleSmsProvider();
   logger.info("sms.provider.selected", { provider: g.smsProvider.name });
   return g.smsProvider;
 }

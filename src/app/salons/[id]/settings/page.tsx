@@ -46,7 +46,7 @@ export default async function SalonSettingsPage({ params }: { params: Promise<{ 
                 <td>{t.payState[m.state]}</td>
                 <td className="muted">{m.requires ? t.payRequires[m.requires] : ""}</td>
                 <td>
-                  {canPay && m.integrated && m.platformEnabled && (
+                  {canPay && m.mode !== "NONE" && m.platformEnabled && (
                     <ActionForm action={salonPaymentMethodAction} submitLabel={m.salonEnabled ? t.common.disable : t.common.enable}>
                       <input type="hidden" name="salonId" value={id} />
                       <input type="hidden" name="method" value={m.method} />

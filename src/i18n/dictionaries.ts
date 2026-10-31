@@ -25,6 +25,8 @@ const ar = {
     verify: "تأكيد",
     changePhone: "تغيير الرقم",
     devNote: "بيئة التطوير: لا تُرسل رسائل فعلية؛ الرمز يظهر في سجل الخادم.",
+    sandboxNote: "وضع تجريبي: لا تُرسل رسائل SMS فعلية. اقرئي رمز الدخول من",
+    sandboxInbox: "صندوق الرسائل التجريبي",
   },
   account: {
     title: "حسابي",
@@ -128,6 +130,8 @@ const en: Dictionary = {
     verify: "Verify",
     changePhone: "Change number",
     devNote: "Development environment: no real SMS is sent; the code is printed in the server log.",
+    sandboxNote: "Sandbox mode: no real SMS is sent. Read your sign-in code in the",
+    sandboxInbox: "sandbox SMS inbox",
   },
   account: {
     title: "My account",

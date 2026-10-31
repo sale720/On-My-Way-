@@ -12,8 +12,9 @@
     "db:deploy": "prisma migrate deploy",
     "test:db:prepare": "dotenv -e .env.test -o -- prisma migrate deploy",
     "test": "npm run test:db:prepare && vitest run",
-    "test:e2e": "node tests/e2e/run.mjs && node tests/e2e/booking.mjs",
-    "admin:grant": "tsx scripts/grant-admin.ts"
+    "test:e2e": "node tests/e2e/run.mjs && node tests/e2e/booking.mjs && node tests/e2e/sandbox.mjs",
+    "admin:grant": "tsx scripts/grant-admin.ts",
+    "demo:seed": "tsx scripts/demo-seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",

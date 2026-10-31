@@ -464,6 +464,9 @@ model Payment {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
+  events  PaymentEvent[]
+  refunds Refund[]
+
   @@index([bookingId])
 }
 
@@ -522,4 +525,50 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, createdAt])
+}
+
+// ───────────────────────────── Sandbox integrations ─────────────────────────────
+
+// Messages produced by the SANDBOX SMS provider. Nothing here was delivered to a phone.
+model SmsMessage {
+  id        String   @id @default(cuid())
+  provider  String
+  to        String
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([to, createdAt])
+}
+
+// Every gateway event is recorded once; a repeated eventId is ignored (idempotent webhooks).
+model PaymentEvent {
+  id        String   @id @default(cuid())
+  provider  String
+  eventId   String
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@unique([provider, eventId])
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+model Refund {
+  id             String       @id @default(cuid())
+  paymentId      String
+  payment        Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  amountHalalas  Int
+  status         RefundStatus @default(PENDING)
+  providerRef    String?      @unique
+  idempotencyKey String       @unique
+  reason         String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }

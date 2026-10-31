@@ -18,7 +18,8 @@ export default async function ConfirmPage({
   if (!sp.addressId || !sp.start || Number.isNaN(Date.parse(sp.start))) redirect("/book");
   const q = await quoteBooking(user, { salonServiceId: serviceId, addressId: sp.addressId });
   const n = (x: { nameAr: string; nameEn: string }) => (locale === "ar" ? x.nameAr : x.nameEn);
-  const firstAvailable = q.paymentMethods.find((m) => m.state === "AVAILABLE")?.method;
+  const selectable = (st: string) => st === "AVAILABLE" || st === "SANDBOX";
+  const firstAvailable = q.paymentMethods.find((m) => selectable(m.state))?.method;
 
   return (
     <section className="flex max-w-xl flex-col gap-4">
@@ -54,8 +55,8 @@ export default async function ConfirmPage({
         <fieldset className="card flex flex-col gap-2" data-testid="payment-methods">
           <legend className="font-bold">{t.book.paymentMethod}</legend>
           {q.paymentMethods.map((m) => (
-            <label key={m.method} className={`flex items-center gap-2 ${m.state === "AVAILABLE" ? "" : "muted"}`} data-method={m.method} data-state={m.state}>
-              <input type="radio" name="paymentMethod" value={m.method} disabled={m.state !== "AVAILABLE"} defaultChecked={m.method === firstAvailable} required />
+            <label key={m.method} className={`flex items-center gap-2 ${selectable(m.state) ? "" : "muted"}`} data-method={m.method} data-state={m.state}>
+              <input type="radio" name="paymentMethod" value={m.method} disabled={!selectable(m.state)} defaultChecked={m.method === firstAvailable} required />
               <span>{t.pay[m.method]}</span>
               {m.state !== "AVAILABLE" && <span className="text-xs">({t.payState[m.state]})</span>}
             </label>

@@ -1,17 +1,19 @@
 import type { PaymentMethod } from "@prisma/client";
+import { env } from "../env";
+import { sandboxGateway } from "./sandbox";
 
 /**
  * Payment method registry (decision D-014: every method is supported and individually switchable).
  *
- * `integrated` reflects what is actually connected in code. Online methods need a payment-gateway
- * adapter (Phase 5); until then they are visible everywhere but cannot be enabled or used.
- * Changing `integrated` to true is only allowed together with a tested gateway adapter.
+ * `integrated` = a LIVE provider is connected in code (real money). Today only cash qualifies.
+ * In PAYMENT_MODE=sandbox every online method is routed to the sandbox gateway: usable for testing,
+ * clearly labelled, never real money. Without sandbox mode, online methods are visible but unusable.
  */
 export interface PaymentMethodInfo {
   method: PaymentMethod;
   kind: "offline" | "card" | "wallet" | "bnpl";
   integrated: boolean;
-  /** What is needed before this method can be switched on. */
+  /** What is needed before this method can go live. */
   requires: string | null;
 }
 
@@ -27,12 +29,23 @@ export const PAYMENT_METHODS: readonly PaymentMethodInfo[] = [
 
 export const methodInfo = (m: PaymentMethod) => PAYMENT_METHODS.find((p) => p.method === m)!;
 
+/** How a method can currently be used: LIVE (real), SANDBOX (simulated), NONE (not usable). */
+export type MethodMode = "LIVE" | "SANDBOX" | "NONE";
+
+export function methodMode(m: PaymentMethod): MethodMode {
+  const info = methodInfo(m);
+  if (info.integrated) return "LIVE";
+  return env().PAYMENT_MODE === "sandbox" ? "SANDBOX" : "NONE";
+}
+
+export const isOnline = (m: PaymentMethod) => methodInfo(m).kind !== "offline";
+
 /** Default platform switch when no admin decision is stored: only integrated offline cash is on. */
 export const defaultPlatformEnabled = (m: PaymentMethod) => m === "CASH";
 
 /**
- * Contract a gateway adapter must fulfil (Phase 5). Declared now so booking/payment code is written
- * against it; no implementation exists yet and nothing pretends to charge a card.
+ * Contract a gateway adapter must fulfil. The sandbox gateway implements it today; a live adapter
+ * (Phase 5) must implement the same contract and pass the same tests before `integrated` becomes true.
  */
 export interface PaymentGateway {
   readonly name: string;
@@ -53,6 +66,9 @@ export interface PaymentGateway {
 }
 
 export function gatewayFor(method: PaymentMethod): PaymentGateway | null {
-  void method;
-  return null; // no gateway integrated yet
+  return isOnline(method) && methodMode(method) === "SANDBOX" ? sandboxGateway : null;
+}
+
+export function gatewayByName(name: string): PaymentGateway | null {
+  return name === "sandbox" && env().PAYMENT_MODE === "sandbox" ? sandboxGateway : null;
 }

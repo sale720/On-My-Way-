@@ -2,7 +2,8 @@
 import { execFileSync } from "node:child_process";
 import { chromium, createHarness, testEnv } from "./lib.mjs";
 
-const h = createHarness(3102);
+// Runs with PAYMENT_MODE=off: verifies that without sandbox mode online methods are visible but never usable.
+const h = createHarness(3102, { PAYMENT_MODE: "off" });
 const { BASE, db, step, assert, login, submit } = h;
 const U = {
   admin: ["0500000201", "+966500000201"],

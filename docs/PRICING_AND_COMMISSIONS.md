@@ -30,6 +30,13 @@ providerNet = subtotal + travelFee − commission            ← قبل رسوم
 - **منع التفعيل:** لا يمكن تفعيل وسيلة غير مُدمجة (`INTEGRATION_REQUIRED`)، ولا توجد مدفوعات وهمية.
 - **تفعيل وسيلة إلكترونية لاحقاً:** تنفيذ واجهة `PaymentGateway` في `src/server/payments/methods.ts` (إنشاء عملية دفع، واسترداد، والتحقق من توقيع Webhook مع منع التكرار عبر `providerRef` الفريد)، ثم تغيير `integrated` إلى `true` بعد اختبارها في بيئة المزوّد.
 
+## الوضع التجريبي للدفع (`PAYMENT_MODE=sandbox`)
+- الحالة الجديدة `SANDBOX`: الوسيلة قابلة للاختيار، ومُعلَّمة «تجريبي — بدون أموال حقيقية». `integrated` تبقى `false` لأنه لا يوجد ربط حقيقي.
+- المسار: الحجز ← `PENDING_PAYMENT` ← صفحة البوابة التجريبية `/pay/sandbox/{ref}` ← حدث موقّع HMAC يمر بنفس معالج الـ Webhook (`/api/payments/webhook/sandbox`) ← `PAID` ← الطلب لمقدمة الخدمة.
+- الحماية: التوقيع إلزامي، وكل `(provider, eventId)` يُعالج مرة واحدة (`PaymentEvent`)، والاسترداد مرة واحدة لكل دفعة (`Refund.idempotencyKey`). أي مبلغ يصل بعد إغلاق الحجز يُسترد.
+- بطاقات الاختبار: `4111 1111 1111 1111` (نجاح)، `4000 0000 0000 0002` (رفض). لا يُخزَّن رقم البطاقة.
+- الانتقال لمزوّد حقيقي: Adapter يطبّق `PaymentGateway` ويجتاز نفس الاختبارات، ثم `integrated: true`، ثم `PAYMENT_MODE=off` في الإنتاج.
+
 ## مؤشرات التقرير (`src/server/reports/service.ts`)
 | المؤشر | التعريف |
 |---|---|

@@ -12,9 +12,9 @@ if (testEnv.APP_ENV !== "test" || !/test/i.test(new URL(testEnv.DATABASE_URL).pa
   throw new Error("E2E must run against the isolated test database");
 }
 
-export function createHarness(port) {
+export function createHarness(port, extraEnv = {}) {
   const BASE = `http://localhost:${port}`;
-  const serverEnv = { ...process.env, ...testEnv, SMS_PROVIDER: "console", PORT: String(port) };
+  const serverEnv = { ...process.env, ...testEnv, SMS_PROVIDER: "console", PORT: String(port), ...extraEnv };
   const db = new PrismaClient({ datasources: { db: { url: testEnv.DATABASE_URL } } });
   const results = [];
   let failed = false;

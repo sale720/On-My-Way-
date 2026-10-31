@@ -20,6 +20,14 @@ const ar = {
     actions: "الإجراءات", customer: "العميلة", provider: "مقدمة الخدمة", salon: "المنشأة", recordCash: "تأكيد استلام المبلغ نقداً", reviewTitle: "قيّمي الخدمة", rating: "التقييم العام",
     punctuality: "الالتزام بالموعد", quality: "جودة الخدمة", comment: "تعليق", sendReview: "إرسال التقييم", yourReview: "تقييمك", empty: "لا توجد حجوزات.", system: "النظام", notes: "ملاحظات",
     reasonPlaceholder: "السبب (إلزامي لهذا الإجراء)", contact: "رقم التواصل",
+    payNow: "إكمال الدفع", payDue: "أكملي الدفع قبل", refund: "الاسترداد", refundStatus: { PENDING: "قيد المعالجة", SUCCEEDED: "تم", FAILED: "فشل" } as Record<string, string>,
+    sandboxPayment: "دفع تجريبي — لم تُنقل أموال حقيقية",
+  },
+  sandbox: {
+    banner: "بوابة دفع تجريبية (Sandbox): لا تُخصم أي أموال ولا تُحفظ بيانات البطاقة. للتجربة فقط.",
+    title: "إتمام الدفع", cardNumber: "رقم البطاقة (تجريبية)", pay: "ادفع", approve: "موافقة على الدفع", decline: "رفض الدفع",
+    testCards: "بطاقات الاختبار", approved: "تتم الموافقة", declined: "يُرفض الدفع", noCardStored: "لا يُخزَّن رقم البطاقة.",
+    closed: "عملية الدفع هذه لم تعد مفتوحة.",
   },
   transitions: {
     CONFIRMED: "قبول الطلب", REJECTED: "رفض الطلب", CANCELLED: "إلغاء الحجز", PROVIDER_EN_ROUTE: "أنا في الطريق", PROVIDER_ARRIVED: "وصلت", IN_PROGRESS: "بدء الخدمة",
@@ -34,7 +42,7 @@ const ar = {
     CASH: "نقداً عند الزيارة", MADA: "مدى", CARD: "بطاقة ائتمانية (Visa / Mastercard)", APPLE_PAY: "Apple Pay", STC_PAY: "STC Pay", TABBY: "تابي (قسّمها)", TAMARA: "تمارا (ادفع لاحقاً)",
   } as Record<string, string>,
   payState: {
-    AVAILABLE: "متاح", NOT_INTEGRATED: "غير مفعّل — يتطلب ربط بوابة الدفع", DISABLED_BY_PLATFORM: "معطّل من المنصة", DISABLED_BY_SALON: "معطّل من المنشأة",
+    AVAILABLE: "متاح", SANDBOX: "تجريبي — بدون أموال حقيقية", NOT_INTEGRATED: "غير مفعّل — يتطلب ربط بوابة الدفع", DISABLED_BY_PLATFORM: "معطّل من المنصة", DISABLED_BY_SALON: "معطّل من المنشأة",
   } as Record<string, string>,
   payStatus: { PENDING: "بانتظار الدفع", AUTHORIZED: "مفوَّض", PAID: "مدفوع", FAILED: "فشل", REFUNDED: "مسترد", PARTIALLY_REFUNDED: "مسترد جزئياً", VOIDED: "ملغى" } as Record<string, string>,
   payRequires: {
@@ -68,7 +76,8 @@ const ar = {
     types: {
       "booking.requested": "طلب حجز جديد", "booking.confirmed": "تم قبول حجزك", "booking.rejected": "تم رفض طلب الحجز", "booking.cancelled": "تم إلغاء حجز",
       "booking.provider_en_route": "مقدمة الخدمة في الطريق", "booking.provider_arrived": "وصلت مقدمة الخدمة", "booking.in_progress": "بدأت الخدمة", "booking.completed": "اكتملت الخدمة — قيّمي تجربتك",
-      "booking.no_show": "سُجّل عدم حضور", "booking.disputed": "فُتح نزاع على حجز", "booking.expired": "انتهت مهلة قبول طلبك وأُلغي", "review.created": "تقييم جديد",
+      "booking.no_show": "سُجّل عدم حضور", "booking.disputed": "فُتح نزاع على حجز", "booking.expired": "انتهت مهلة طلبك وأُلغي", "review.created": "تقييم جديد",
+      "payment.paid": "تم الدفع (تجريبي) وأُرسل الطلب لمقدمة الخدمة", "payment.failed": "فشل الدفع وأُلغي الطلب", "payment.refunded": "تم استرداد المبلغ",
     } as Record<string, string>,
   },
 };
@@ -95,6 +104,14 @@ const en: Dict2 = {
     actions: "Actions", customer: "Customer", provider: "Provider", salon: "Salon", recordCash: "Confirm cash received", reviewTitle: "Rate the service", rating: "Overall rating",
     punctuality: "Punctuality", quality: "Quality", comment: "Comment", sendReview: "Submit review", yourReview: "Your review", empty: "No bookings.", system: "System", notes: "Notes",
     reasonPlaceholder: "Reason (required for this action)", contact: "Contact number",
+    payNow: "Complete payment", payDue: "Complete payment before", refund: "Refund", refundStatus: { PENDING: "Processing", SUCCEEDED: "Done", FAILED: "Failed" },
+    sandboxPayment: "Sandbox payment — no real money moved",
+  },
+  sandbox: {
+    banner: "Sandbox payment gateway: no money is charged and no card data is stored. Testing only.",
+    title: "Complete payment", cardNumber: "Card number (test)", pay: "Pay", approve: "Approve payment", decline: "Decline payment",
+    testCards: "Test cards", approved: "approved", declined: "declined", noCardStored: "The card number is not stored.",
+    closed: "This payment is no longer open.",
   },
   transitions: {
     CONFIRMED: "Accept request", REJECTED: "Reject request", CANCELLED: "Cancel booking", PROVIDER_EN_ROUTE: "I'm on my way", PROVIDER_ARRIVED: "I've arrived", IN_PROGRESS: "Start service",
@@ -106,7 +123,7 @@ const en: Dict2 = {
     REJECTED: "Rejected", NO_SHOW: "No-show", DISPUTED: "Disputed", REFUND_PENDING: "Refund pending", REFUNDED: "Refunded", PARTIALLY_REFUNDED: "Partially refunded",
   },
   pay: { CASH: "Cash on visit", MADA: "mada", CARD: "Credit card (Visa / Mastercard)", APPLE_PAY: "Apple Pay", STC_PAY: "STC Pay", TABBY: "Tabby (split it)", TAMARA: "Tamara (pay later)" },
-  payState: { AVAILABLE: "Available", NOT_INTEGRATED: "Not active — requires payment-gateway integration", DISABLED_BY_PLATFORM: "Disabled by platform", DISABLED_BY_SALON: "Disabled by salon" },
+  payState: { AVAILABLE: "Available", SANDBOX: "Sandbox — no real money", NOT_INTEGRATED: "Not active — requires payment-gateway integration", DISABLED_BY_PLATFORM: "Disabled by platform", DISABLED_BY_SALON: "Disabled by salon" },
   payStatus: { PENDING: "Pending", AUTHORIZED: "Authorized", PAID: "Paid", FAILED: "Failed", REFUNDED: "Refunded", PARTIALLY_REFUNDED: "Partially refunded", VOIDED: "Voided" },
   payRequires: {
     gateway: "Merchant account with a Saudi payment gateway + integration", "gateway+apple_merchant": "Payment gateway + Apple Pay merchant account", bnpl_contract: "BNPL provider contract + integration",
@@ -140,6 +157,7 @@ const en: Dict2 = {
       "booking.requested": "New booking request", "booking.confirmed": "Your booking was accepted", "booking.rejected": "Booking request rejected", "booking.cancelled": "A booking was cancelled",
       "booking.provider_en_route": "Your provider is on the way", "booking.provider_arrived": "Your provider has arrived", "booking.in_progress": "Service started", "booking.completed": "Service completed — rate your experience",
       "booking.no_show": "No-show recorded", "booking.disputed": "A dispute was opened", "booking.expired": "Your request expired and was cancelled", "review.created": "New review",
+      "payment.paid": "Payment received (sandbox); request sent to the provider", "payment.failed": "Payment failed; request cancelled", "payment.refunded": "Amount refunded",
     },
   },
 };

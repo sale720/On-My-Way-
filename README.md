@@ -3,6 +3,9 @@
 
 **الحالة:** المرحلة 1 (الأساس التقني) والمرحلة 2 (MVP التشغيلي: الحجز بالدفع النقدي، وجميع وسائل الدفع الإلكترونية مضافة وظاهرة بانتظار ربط البوابة) منفّذتان ومختبرتان. التفاصيل في [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
+## جرّبها الآن (داخل GitHub، بلا سيرفرات)
+**Code ← Codespaces ← Create codespace**، ثم اتبع [`docs/TRY_IT.md`](docs/TRY_IT.md). الوضع تجريبي: لا رسائل SMS حقيقية ولا أموال حقيقية.
+
 ## الوثائق
 - **المرجع الأعلى للمتطلبات:** [`docs/MASTER_PROMPT.md`](docs/MASTER_PROMPT.md)
 - المعمارية: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · القرارات: [`docs/DECISIONS.md`](docs/DECISIONS.md)

@@ -100,7 +100,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
             </article>
           ))}
           {result.excluded.length > 0 && (
-            <details className="card text-sm">
+            <details className="card text-sm" open={result.offers.length === 0}>
               <summary>
                 {t.book.excluded} ({result.excluded.length})
               </summary>

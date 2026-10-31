@@ -13,7 +13,21 @@ import {
 import { createBooking } from "@/server/bookings/service";
 import { updateSalonPolicy } from "@/server/salons/service";
 import { addMember } from "@/server/salons/service";
+import { resetEnvCache } from "@/server/env";
 import { resetTestDb, signIn } from "../helpers";
+
+/** Run a block with PAYMENT_MODE overridden, restoring it afterwards. */
+async function withPaymentMode<T>(mode: "off" | "sandbox", fn: () => Promise<T>) {
+  const prev = process.env.PAYMENT_MODE;
+  process.env.PAYMENT_MODE = mode;
+  resetEnvCache();
+  try {
+    return await fn();
+  } finally {
+    process.env.PAYMENT_MODE = prev;
+    resetEnvCache();
+  }
+}
 import { firstSlot, marketplace } from "../fixtures";
 
 beforeEach(resetTestDb);
@@ -33,7 +47,7 @@ describe("catalog, geography and settings permissions", () => {
     const city = await createCity(admin.actor, { nameAr: "جدة", nameEn: "Jeddah" });
     await createDistrict(admin.actor, { cityId: city.id, nameAr: "الروضة", nameEn: "Ar Rawdah" });
 
-    expect(await getSettings()).toEqual({ commissionBps: 0, vatBps: 0 }); // nothing charged until set
+    expect(await getSettings()).toEqual({ commissionBps: 0, vatBps: 0, paymentWindowMinutes: 15 }); // nothing charged until set
     await setSetting(admin.actor, "commissionBps", 1200, "board decision 12%");
     await expect(setSetting(admin.actor, "vatBps", 20_000, "bad value")).rejects.toMatchObject({ code: "VALIDATION" });
     expect((await getSettings()).commissionBps).toBe(1200);
@@ -71,27 +85,38 @@ describe("catalog, geography and settings permissions", () => {
 });
 
 describe("payment methods: all present, individually switchable, only integrated ones usable", () => {
-  it("the platform view lists all seven methods with their real state", async () => {
-    const admin = await signIn(undefined, ["PLATFORM_ADMIN"]);
-    const list = await listPlatformPaymentMethods(admin.actor);
-    expect(list.map((m) => [m.method, m.state])).toEqual([
-      ["CASH", "AVAILABLE"],
-      ["MADA", "NOT_INTEGRATED"],
-      ["CARD", "NOT_INTEGRATED"],
-      ["APPLE_PAY", "NOT_INTEGRATED"],
-      ["STC_PAY", "NOT_INTEGRATED"],
-      ["TABBY", "NOT_INTEGRATED"],
-      ["TAMARA", "NOT_INTEGRATED"],
-    ]);
-    const customer = await signIn();
-    await expect(listPlatformPaymentMethods(customer.actor)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  it("PAYMENT_MODE=off: all seven are listed; online ones are NOT_INTEGRATED and cannot be switched on (no fake payments)", async () => {
+    await withPaymentMode("off", async () => {
+      const admin = await signIn(undefined, ["PLATFORM_ADMIN"]);
+      const list = await listPlatformPaymentMethods(admin.actor);
+      expect(list.map((m) => [m.method, m.state])).toEqual([
+        ["CASH", "AVAILABLE"],
+        ["MADA", "NOT_INTEGRATED"],
+        ["CARD", "NOT_INTEGRATED"],
+        ["APPLE_PAY", "NOT_INTEGRATED"],
+        ["STC_PAY", "NOT_INTEGRATED"],
+        ["TABBY", "NOT_INTEGRATED"],
+        ["TAMARA", "NOT_INTEGRATED"],
+      ]);
+      await expect(setPlatformPaymentMethod(admin.actor, "APPLE_PAY", true, "launch")).rejects.toMatchObject({ code: "INTEGRATION_REQUIRED" });
+      const customer = await signIn();
+      await expect(listPlatformPaymentMethods(customer.actor)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    });
   });
 
-  it("a method without a gateway cannot be switched on (no fake payments)", async () => {
-    const admin = await signIn(undefined, ["PLATFORM_ADMIN"]);
-    await expect(setPlatformPaymentMethod(admin.actor, "APPLE_PAY", true, "launch")).rejects.toMatchObject({ code: "INTEGRATION_REQUIRED" });
-    const m = await marketplace();
-    await expect(setSalonPaymentMethod(m.owner.actor, m.salon.id, "MADA", true)).rejects.toMatchObject({ code: "INTEGRATION_REQUIRED" });
+  it("PAYMENT_MODE=sandbox: online methods start disabled, can be enabled, and are then labelled SANDBOX (never AVAILABLE/live)", async () => {
+    await withPaymentMode("sandbox", async () => {
+      const m = await marketplace();
+      let list = await listPlatformPaymentMethods(m.admin.actor);
+      expect(list.filter((x) => x.method !== "CASH").every((x) => x.state === "DISABLED_BY_PLATFORM" && !x.integrated)).toBe(true);
+      await setPlatformPaymentMethod(m.admin.actor, "MADA", true, "sandbox testing");
+      list = await listPlatformPaymentMethods(m.admin.actor);
+      expect(list.find((x) => x.method === "MADA")).toMatchObject({ state: "SANDBOX", mode: "SANDBOX", integrated: false });
+      // Salon may opt out of a sandbox method; staff cannot change it.
+      await setSalonPaymentMethod(m.owner.actor, m.salon.id, "MADA", false);
+      expect((await listSalonPaymentMethods(m.owner.actor, m.salon.id)).find((x) => x.method === "MADA")?.state).toBe("DISABLED_BY_SALON");
+      await expect(setSalonPaymentMethod(m.provider.actor, m.salon.id, "MADA", true)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    });
   });
 
   it("switching cash off at the platform or the salon blocks cash bookings; switching back restores them", async () => {
