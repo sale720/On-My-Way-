@@ -104,3 +104,8 @@ E2E المرحلة 1: **12/12 ما زالت ناجحة**.
 
 ### خلل اكتُشف بالاختبار وأُصلح
 - نماذج «إضافة عنوان» و«حذف عنوان» و«تفعيل فئة» كانت تحفظ دون إظهار رسالة نجاح للمستخدم → صارت تُظهر «تم الحفظ».
+
+### نتيجة CI للمرحلة 2 (GitHub Actions)
+- [Run #4](https://github.com/sale720/On-My-Way-/actions/runs/41209041829) (`c0ea0bd`، الخلفية): **success**.
+- [Run #5](https://github.com/sale720/On-My-Way-/actions/runs/41210137745) (`8eb3e84`، الواجهة وE2E): **success**. lint ✓ · typecheck ✓ · unit+integration ✓ · build ✓ · E2E (المرحلتان) ✓.
+- سطر `conflicting key value violates exclusion constraint "booking_no_overlap_per_provider"` في سجل PostgreSQL **متوقع**: مصدره اختبار يحاول عمداً إدراج حجز متداخل مباشرة، ويثبت أن القيد يعمل في CI أيضاً.
