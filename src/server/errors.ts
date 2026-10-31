@@ -9,7 +9,14 @@ export type ErrorCode =
   | "OTP_EXPIRED"
   | "OTP_LOCKED"
   | "ACCOUNT_SUSPENDED"
-  | "LAST_OWNER";
+  | "LAST_OWNER"
+  | "INTEGRATION_REQUIRED"
+  | "PAYMENT_METHOD_UNAVAILABLE"
+  | "SLOT_UNAVAILABLE"
+  | "NOT_ELIGIBLE"
+  | "INVALID_TRANSITION"
+  | "LATE_CANCELLATION"
+  | "ALREADY_REVIEWED";
 
 /** Expected, user-facing failure. `code` maps to a localized message in the UI. */
 export class AppError extends Error {

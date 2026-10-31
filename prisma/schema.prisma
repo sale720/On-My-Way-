@@ -1,5 +1,6 @@
 // Phase 1 — Technical foundation: identity, sessions, RBAC, tenant (salon) isolation, audit.
-// Marketplace/booking models are introduced in Phase 2 (see docs/DECISIONS.md, D-004).
+// Phase 2 — Operational MVP: catalog, geography & coverage, availability, bookings, payments, reviews.
+// All Phase 2 changes are additive (new tables / new columns with defaults).
 
 generator client {
   provider = "prisma-client-js"
@@ -61,6 +62,12 @@ model User {
   memberships SalonMembership[]
   auditLogs   AuditLog[]
   salonsMade  Salon[]
+
+  addresses     CustomerAddress[]
+  bookings      Booking[]              @relation("CustomerBookings")
+  reviews       Review[]
+  notifications Notification[]
+  statusChanges BookingStatusHistory[]
 }
 
 model PlatformRoleAssignment {
@@ -113,8 +120,20 @@ model Salon {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  memberships SalonMembership[]
-  auditLogs   AuditLog[]
+  // Operating policy (configurable per salon; defaults documented in docs/BOOKING_LIFECYCLE.md)
+  travelBufferMinutes      Int @default(30) // reserved before each visit for travel (until routing is integrated)
+  minNoticeMinutes         Int @default(120)
+  maxAdvanceDays           Int @default(30)
+  cancellationWindowHours  Int @default(24)
+  acceptanceTimeoutMinutes Int @default(60)
+
+  memberships    SalonMembership[]
+  auditLogs      AuditLog[]
+  services       SalonService[]
+  coverageAreas  SalonCoverageArea[]
+  bookings       Booking[]
+  paymentMethods SalonPaymentMethod[]
+  reviews        Review[]
 }
 
 model SalonMembership {
@@ -127,6 +146,13 @@ model SalonMembership {
   status    MembershipStatus @default(ACTIVE)
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
+
+  skills       StaffService[]
+  coverage     StaffCoverage[]
+  availability AvailabilityRule[]
+  exceptions   AvailabilityException[]
+  bookings     Booking[]
+  reviews      Review[]
 
   @@unique([salonId, userId])
   @@index([userId])
@@ -149,4 +175,351 @@ model AuditLog {
   @@index([targetType, targetId])
   @@index([salonId, createdAt])
   @@index([createdAt])
+}
+
+// ───────────────────────────── Phase 2 ─────────────────────────────
+
+// Geography (admin-managed reference data; no seeded placeholder data in production)
+model City {
+  id        String     @id @default(cuid())
+  nameAr    String
+  nameEn    String
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  districts District[]
+
+  @@unique([nameEn])
+}
+
+model District {
+  id        String   @id @default(cuid())
+  cityId    String
+  city      City     @relation(fields: [cityId], references: [id])
+  nameAr    String
+  nameEn    String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  salonCoverage SalonCoverageArea[]
+  staffCoverage StaffCoverage[]
+  addresses     CustomerAddress[]
+
+  @@unique([cityId, nameEn])
+}
+
+// Catalog
+model ServiceCategory {
+  id        String         @id @default(cuid())
+  slug      String         @unique
+  nameAr    String
+  nameEn    String
+  sortOrder Int            @default(0)
+  active    Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  services  SalonService[]
+}
+
+model SalonService {
+  id              String          @id @default(cuid())
+  salonId         String
+  salon           Salon           @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  categoryId      String
+  category        ServiceCategory @relation(fields: [categoryId], references: [id])
+  nameAr          String
+  nameEn          String
+  descriptionAr   String?
+  descriptionEn   String?
+  durationMinutes Int
+  priceHalalas    Int // SAR minor units (1 SAR = 100 halalas)
+  active          Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  staff        StaffService[]
+  bookingItems BookingItem[]
+
+  @@index([salonId])
+  @@index([categoryId, active])
+}
+
+// Which staff member can perform which salon service
+model StaffService {
+  membershipId   String
+  membership     SalonMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  salonServiceId String
+  salonService   SalonService    @relation(fields: [salonServiceId], references: [id], onDelete: Cascade)
+
+  @@id([membershipId, salonServiceId])
+}
+
+// Level 1 coverage: where the salon operates, with its travel fee for that district
+model SalonCoverageArea {
+  id               String   @id @default(cuid())
+  salonId          String
+  salon            Salon    @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  districtId       String
+  district         District @relation(fields: [districtId], references: [id])
+  travelFeeHalalas Int      @default(0)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([salonId, districtId])
+}
+
+// Level 2 coverage: where an individual provider can actually go (must also be inside the salon's area)
+model StaffCoverage {
+  membershipId String
+  membership   SalonMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  districtId   String
+  district     District        @relation(fields: [districtId], references: [id])
+
+  @@id([membershipId, districtId])
+}
+
+// Weekly working hours (Asia/Riyadh local time). weekday: 0 = Sunday … 6 = Saturday
+model AvailabilityRule {
+  id           String          @id @default(cuid())
+  membershipId String
+  membership   SalonMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  weekday      Int
+  startMinute  Int
+  endMinute    Int
+
+  @@index([membershipId, weekday])
+}
+
+// Whole-day unavailability (leave, holiday)
+model AvailabilityException {
+  id           String          @id @default(cuid())
+  membershipId String
+  membership   SalonMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  date         DateTime        @db.Date
+  reason       String?
+
+  @@unique([membershipId, date])
+}
+
+model CustomerAddress {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label        String?
+  districtId   String
+  district     District  @relation(fields: [districtId], references: [id])
+  street       String
+  building     String?
+  floor        String?
+  instructions String?
+  latitude     Float?
+  longitude    Float?
+  deletedAt    DateTime? // soft delete: past bookings keep their snapshot
+  createdAt    DateTime  @default(now())
+
+  bookings Booking[]
+
+  @@index([userId])
+}
+
+enum BookingStatus {
+  DRAFT
+  PENDING_AVAILABILITY_CHECK
+  PENDING_PROVIDER_ACCEPTANCE
+  PENDING_PAYMENT
+  CONFIRMED
+  ASSIGNED
+  PROVIDER_EN_ROUTE
+  PROVIDER_ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  REJECTED
+  NO_SHOW
+  DISPUTED
+  REFUND_PENDING
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum BookingSource {
+  MARKETPLACE
+  DIRECT
+}
+
+enum PaymentMethod {
+  CASH
+  MADA
+  CARD
+  APPLE_PAY
+  STC_PAY
+  TABBY
+  TAMARA
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  VOIDED
+}
+
+model Booking {
+  id                String           @id @default(cuid())
+  number            String           @unique // human-readable reference, e.g. OMW-7K3Q9X
+  customerId        String
+  customer          User             @relation("CustomerBookings", fields: [customerId], references: [id])
+  salonId           String
+  salon             Salon            @relation(fields: [salonId], references: [id])
+  staffMembershipId String
+  staff             SalonMembership  @relation(fields: [staffMembershipId], references: [id])
+  addressId         String?
+  address           CustomerAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  source            BookingSource    @default(MARKETPLACE)
+  status            BookingStatus
+  startsAt          DateTime
+  endsAt            DateTime
+  // Time the provider is reserved: [blockedFrom, endsAt). Enforced non-overlapping per provider by a DB exclusion constraint.
+  blockedFrom       DateTime
+  acceptBy          DateTime? // pending bookings auto-expire after this
+
+  // Address snapshot (shown to the provider only once confirmed)
+  addrCityAr       String
+  addrCityEn       String
+  addrDistrictAr   String
+  addrDistrictEn   String
+  addrDistrictId   String
+  addrStreet       String
+  addrBuilding     String?
+  addrFloor        String?
+  addrInstructions String?
+
+  // Price snapshot (halalas) and the policies in force at booking time
+  subtotalHalalas         Int
+  travelFeeHalalas        Int
+  vatBps                  Int
+  vatHalalas              Int
+  totalHalalas            Int
+  commissionBps           Int
+  commissionHalalas       Int
+  currency                String @default("SAR")
+  cancellationWindowHours Int
+
+  paymentMethod PaymentMethod
+  paymentStatus PaymentStatus @default(PENDING)
+  notes         String?
+  cancelReason  String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  items    BookingItem[]
+  history  BookingStatusHistory[]
+  payments Payment[]
+  review   Review?
+
+  @@index([customerId, startsAt])
+  @@index([salonId, startsAt])
+  @@index([staffMembershipId, startsAt])
+  @@index([status, acceptBy])
+}
+
+model BookingItem {
+  id              String       @id @default(cuid())
+  bookingId       String
+  booking         Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  salonServiceId  String
+  salonService    SalonService @relation(fields: [salonServiceId], references: [id])
+  nameAr          String
+  nameEn          String
+  durationMinutes Int
+  priceHalalas    Int
+}
+
+model BookingStatusHistory {
+  id        String         @id @default(cuid())
+  bookingId String
+  booking   Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  from      BookingStatus?
+  to        BookingStatus
+  actorId   String? // null = system (e.g. acceptance timeout)
+  actor     User?          @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  reason    String?
+  createdAt DateTime       @default(now())
+
+  @@index([bookingId, createdAt])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  bookingId     String
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  method        PaymentMethod
+  amountHalalas Int
+  status        PaymentStatus @default(PENDING)
+  provider      String? // gateway name once integrated; null for cash
+  providerRef   String?       @unique // gateway transaction id (idempotency)
+  recordedById  String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([bookingId])
+}
+
+// Platform-level switch per payment method. Availability also requires the gateway integration (code registry).
+model PaymentMethodConfig {
+  method      PaymentMethod @id
+  enabled     Boolean       @default(false)
+  updatedById String?
+  updatedAt   DateTime      @updatedAt
+}
+
+// Salon-level opt-in, within what the platform allows
+model SalonPaymentMethod {
+  salonId String
+  salon   Salon         @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  method  PaymentMethod
+  enabled Boolean       @default(true)
+
+  @@id([salonId, method])
+}
+
+// Commercial settings (commission, VAT…) — configurable, never hard-coded
+model PlatformSetting {
+  key         String   @id
+  value       Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+}
+
+model Review {
+  id                String          @id @default(cuid())
+  bookingId         String          @unique // one review per booking
+  booking           Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customerId        String
+  customer          User            @relation(fields: [customerId], references: [id])
+  salonId           String
+  salon             Salon           @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  staffMembershipId String
+  staff             SalonMembership @relation(fields: [staffMembershipId], references: [id])
+  rating            Int // 1..5, also enforced by a CHECK constraint
+  punctuality       Int?
+  quality           Int?
+  comment           String?
+  createdAt         DateTime        @default(now())
+
+  @@index([salonId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  payload   Json
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }

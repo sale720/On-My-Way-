@@ -7,9 +7,9 @@ import type { PlatformRole } from "@prisma/client";
 export async function resetTestDb() {
   const name = new URL(process.env.DATABASE_URL!).pathname;
   if (process.env.APP_ENV !== "test" || !/test/i.test(name)) throw new Error("resetTestDb outside test DB");
-  await db.$executeRawUnsafe(
-    'TRUNCATE "AuditLog","SalonMembership","Salon","Session","OtpChallenge","PlatformRoleAssignment","User" RESTART IDENTITY CASCADE',
-  );
+  const tables = await db.$queryRaw<{ tablename: string }[]>`
+    SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
+  await db.$executeRawUnsafe(`TRUNCATE ${tables.map((t) => `"${t.tablename}"`).join(",")} RESTART IDENTITY CASCADE`);
   (smsProvider() as MemorySmsProvider).outbox.length = 0;
 }
 

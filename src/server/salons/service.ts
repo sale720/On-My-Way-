@@ -178,3 +178,39 @@ export async function setSalonStatus(actor: Actor | null, salonId: string, statu
     return updated;
   });
 }
+
+const policySchema = z.object({
+  travelBufferMinutes: z.coerce.number().int().min(0).max(240),
+  minNoticeMinutes: z.coerce.number().int().min(0).max(10_080),
+  maxAdvanceDays: z.coerce.number().int().min(1).max(365),
+  cancellationWindowHours: z.coerce.number().int().min(0).max(168),
+  acceptanceTimeoutMinutes: z.coerce.number().int().min(5).max(1440),
+});
+
+/** Salon operating policy. Applies to new bookings only; existing bookings keep their snapshot. */
+export async function updateSalonPolicy(actor: Actor | null, salonId: string, input: Record<string, unknown>) {
+  const d = parse(policySchema, input);
+  return db.$transaction(async (tx) => {
+    const access = await requireSalonPermission(tx, actor, salonId, "salon.settings.manage");
+    const before = await tx.salon.findUniqueOrThrow({ where: { id: salonId } });
+    const salon = await tx.salon.update({ where: { id: salonId }, data: d });
+    await audit(tx, {
+      actorId: access.actor.id,
+      action: "salon.policy.updated",
+      targetType: "Salon",
+      targetId: salonId,
+      salonId,
+      metadata: {
+        from: {
+          travelBufferMinutes: before.travelBufferMinutes,
+          minNoticeMinutes: before.minNoticeMinutes,
+          maxAdvanceDays: before.maxAdvanceDays,
+          cancellationWindowHours: before.cancellationWindowHours,
+          acceptanceTimeoutMinutes: before.acceptanceTimeoutMinutes,
+        },
+        to: d,
+      },
+    });
+    return salon;
+  });
+}

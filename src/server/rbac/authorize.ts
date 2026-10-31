@@ -62,3 +62,30 @@ export async function requireSalonPermission(
 
   throw new AppError("NOT_FOUND");
 }
+
+/**
+ * Staff-scoped gate: a provider may act on her *own* membership (schedule, skills, coverage, her bookings);
+ * acting on another member requires the salon permission. The membership must belong to `salonId`.
+ */
+export async function requireSelfOrSalonPermission(
+  tx: Db,
+  actor: Actor | null,
+  salonId: string,
+  membershipId: string,
+  permission: SalonPermission,
+): Promise<SalonAccess & { self: boolean }> {
+  if (!actor) throw new AppError("UNAUTHENTICATED");
+  const target = await tx.salonMembership.findFirst({ where: { id: membershipId, salonId } });
+  if (target && target.userId === actor.id && target.status === "ACTIVE") {
+    return { actor, salonId, membership: target, role: target.role, self: true };
+  }
+  const access = await requireSalonPermission(tx, actor, salonId, permission);
+  if (!target) throw new AppError("NOT_FOUND");
+  return { ...access, self: false };
+}
+
+/** Active membership of the actor in a salon, or null. */
+export async function activeMembership(tx: Db, actorId: string, salonId: string) {
+  const m = await tx.salonMembership.findUnique({ where: { salonId_userId: { salonId, userId: actorId } } });
+  return m && m.status === "ACTIVE" ? m : null;
+}
