@@ -3,7 +3,8 @@ import Link from "next/link";
 import { IBM_Plex_Sans_Arabic } from "next/font/google";
 import { dirOf } from "@/i18n/dictionaries";
 import { hasPlatformPermission } from "@/server/rbac/authorize";
-import { getCurrentUser, getDictionary, getLocale } from "@/server/web";
+import { getCurrentUser, getDictionary, getDict2, getLocale } from "@/server/web";
+import { unreadCount } from "@/server/notifications/service";
 import { logoutAction, setLocaleAction } from "./actions";
 import "./globals.css";
 
@@ -22,7 +23,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [locale, dict, user] = await Promise.all([getLocale(), getDictionary(), getCurrentUser()]);
+  const [locale, dict, t2, user] = await Promise.all([getLocale(), getDictionary(), getDict2(), getCurrentUser()]);
+  const unread = await unreadCount(user);
   const isStaff = user && hasPlatformPermission(user, "platform.users.read");
 
   return (
@@ -36,6 +38,19 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             <span className="flex-1" />
             {user ? (
               <>
+                <Link href="/book" data-testid="nav-book">
+                  {t2.nav.book}
+                </Link>
+                <Link href="/bookings">{t2.nav.bookings}</Link>
+                <Link href="/addresses">{t2.nav.addresses}</Link>
+                <Link href="/notifications" data-testid="nav-notifications">
+                  {t2.nav.notifications}
+                  {unread > 0 && (
+                    <span className="btn ms-1 px-2 py-0 text-xs" data-testid="unread">
+                      {unread}
+                    </span>
+                  )}
+                </Link>
                 <Link href="/account" data-testid="nav-account">
                   {dict.nav.account}
                 </Link>

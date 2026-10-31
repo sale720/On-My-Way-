@@ -5,6 +5,7 @@ import { getSalon, listMembers } from "@/server/salons/service";
 import { getCurrentUser, getDictionary } from "@/server/web";
 import { ActionForm } from "../../_components/ActionForm";
 import { addMemberAction, renameSalonAction, updateMemberAction } from "../../actions";
+import { SalonTabs } from "./SalonTabs";
 
 export default async function SalonPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -38,6 +39,7 @@ export default async function SalonPage({ params }: { params: Promise<{ id: stri
           {role ? `${dict.salon.yourRole}: ${dict.enums[role]}` : dict.salon.platformView}
         </p>
       </div>
+      <SalonTabs salonId={salon.id} current="overview" />
 
       {canManageProfile && (
         <ActionForm action={renameSalonAction} submitLabel={dict.salon.rename} className="card flex flex-wrap items-end gap-2">

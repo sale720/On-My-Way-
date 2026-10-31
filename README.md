@@ -1,7 +1,7 @@
 # On-My-Way-
 منصة لإدارة حجوزات ومواعيد العملاء وتقييماتهم، وإدارة خدمات مقدّمي الخدمة المنزلية في مجال الصالونات النسائية، مع إمكانية التوسّع في مجالات أخرى.
 
-**الحالة:** المرحلة 1 (الأساس التقني) منفّذة ومختبرة على فرع `feat/initial-scaffold`. الحجز لم يُبنَ بعد. التفاصيل في [`docs/ROADMAP.md`](docs/ROADMAP.md).
+**الحالة:** المرحلة 1 (الأساس التقني) والمرحلة 2 (MVP التشغيلي: الحجز بالدفع النقدي، وجميع وسائل الدفع الإلكترونية مضافة وظاهرة بانتظار ربط البوابة) منفّذتان ومختبرتان. التفاصيل في [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## الوثائق
 - **المرجع الأعلى للمتطلبات:** [`docs/MASTER_PROMPT.md`](docs/MASTER_PROMPT.md)
@@ -9,6 +9,7 @@
 - الأدوار والصلاحيات: [`docs/USER_ROLES_AND_PERMISSIONS.md`](docs/USER_ROLES_AND_PERMISSIONS.md)
 - نموذج البيانات: [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) · الأمن: [`docs/SECURITY_AND_PRIVACY.md`](docs/SECURITY_AND_PRIVACY.md)
 - الاختبارات ونتائجها: [`docs/TEST_STRATEGY.md`](docs/TEST_STRATEGY.md) · النشر: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+- دورة الحجز: [`docs/BOOKING_LIFECYCLE.md`](docs/BOOKING_LIFECYCLE.md) · التغطية: [`docs/GEO_COVERAGE_ENGINE.md`](docs/GEO_COVERAGE_ENGINE.md) · التسعير والدفع: [`docs/PRICING_AND_COMMISSIONS.md`](docs/PRICING_AND_COMMISSIONS.md)
 - التكاملات: [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md) · القيود: [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md) · [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 - مسودة المواصفات الأولى (متجاوزة): [`docs/SPEC.md`](docs/SPEC.md)
 

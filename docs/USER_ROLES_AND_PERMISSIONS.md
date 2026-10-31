@@ -31,3 +31,12 @@
 - المدير لا يستطيع تعليق نفسه أو سحب دور `PLATFORM_ADMIN` من نفسه.
 - تعليق مستخدم يلغي جميع جلساته فوراً.
 - كل تغيير حالة/دور يتطلب سبباً (3 أحرف على الأقل) ويُسجَّل في `AuditLog`.
+
+## إضافات المرحلة 2
+**منصة:** `platform.catalog.manage`، `platform.geo.manage`، `platform.settings.manage`، `platform.payments.manage`، `platform.bookings.manage`، `platform.reports.read` (مدير المنصة)؛ `platform.bookings.read` (المدير والدعم)؛ `customer.bookings.manage` (الجميع).
+
+**منشأة:** `salon.services.manage`، `salon.coverage.manage`، `salon.staff.manage`، `salon.bookings.read`، `salon.bookings.manage` (مالكة ومديرة)؛ `salon.settings.manage`، `salon.payments.manage` (مالكة فقط).
+
+**مقدمة الخدمة (STAFF):** تدير جدولها وخدماتها وأحياءها **بنفسها فقط** (`requireSelfOrSalonPermission`)، وترى وتنفّذ الحجوزات المسندة إليها فقط.
+
+**الدعم:** يقرأ الحجوزات لمعالجة الحالات، ولا يغيّر حالتها ولا مدفوعاتها.

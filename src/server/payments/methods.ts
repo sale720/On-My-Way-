@@ -52,6 +52,7 @@ export interface PaymentGateway {
   }>;
 }
 
-export function gatewayFor(_method: PaymentMethod): PaymentGateway | null {
+export function gatewayFor(method: PaymentMethod): PaymentGateway | null {
+  void method;
   return null; // no gateway integrated yet
 }

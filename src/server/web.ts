@@ -1,5 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { cache } from "react";
+import { dict2 } from "@/i18n/p2";
 import { dictionaries, DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, type AppLocale } from "@/i18n/dictionaries";
 import { resolveSession, type CurrentUser } from "./auth/service";
 import { AUTH_POLICY } from "./auth/policy";
@@ -23,6 +24,10 @@ export const getLocale = cache(async (): Promise<AppLocale> => {
 
 export async function getDictionary() {
   return dictionaries[await getLocale()];
+}
+
+export async function getDict2() {
+  return dict2[await getLocale()];
 }
 
 /**

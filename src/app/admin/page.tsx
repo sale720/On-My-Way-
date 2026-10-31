@@ -7,6 +7,7 @@ import { listAuditLog, listUsers } from "@/server/users/service";
 import { getCurrentUser, getDictionary, getLocale } from "@/server/web";
 import { ActionForm } from "../_components/ActionForm";
 import { changeRoleAction, setSalonStatusAction, setUserStatusAction } from "../actions";
+import { AdminNav } from "./AdminNav";
 
 const ROLES: PlatformRole[] = ["CUSTOMER", "PROVIDER", "SUPPORT_AGENT", "PLATFORM_ADMIN"];
 
@@ -36,6 +37,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   return (
     <section className="flex flex-col gap-8">
       <h1 className="text-2xl font-bold">{dict.admin.title}</h1>
+      <AdminNav actor={user} current="home" />
 
       <div className="card flex flex-col gap-3">
         <h2 className="text-lg font-bold">{dict.admin.users}</h2>

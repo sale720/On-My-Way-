@@ -92,9 +92,10 @@ async function login(page, localPhone, e164) {
 }
 
 const db = new PrismaClient({ datasources: { db: { url: testEnv.DATABASE_URL } } });
-await db.$executeRawUnsafe(
-  'TRUNCATE "AuditLog","SalonMembership","Salon","Session","OtpChallenge","PlatformRoleAssignment","User" RESTART IDENTITY CASCADE',
-);
+{
+  const tables = await db.$queryRaw`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename <> '_prisma_migrations'`;
+  await db.$executeRawUnsafe(`TRUNCATE ${tables.map((t) => `"${t.tablename}"`).join(",")} RESTART IDENTITY CASCADE`);
+}
 
 const A = { local: "0500000101", e164: "+966500000101" };
 const B = { local: "0500000102", e164: "+966500000102" };

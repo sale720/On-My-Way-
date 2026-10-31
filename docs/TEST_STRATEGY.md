@@ -61,3 +61,46 @@ PASS  secrets are not written to the server log in clear text
 - ملاحظات من سجل Run #1 أُصلحت في الـ commit التالي:
   1. فحص صحة PostgreSQL كان يتصل بقاعدة `omw` غير الموجودة (ضجيج `FATAL` في السجل، دون أثر على النتيجة) → أُضيف `-d omw_test`.
   2. سكربت E2E بقي معلّقاً ~57 ثانية بعد انتهاء الاختبارات بسبب مؤقّت لم يُلغَ → أُلغي المؤقّت؛ المدة المحلية الآن 14 ثانية.
+
+---
+
+## المرحلة 2 — النتائج الفعلية (2026-10-31، محلياً)
+
+### Unit + Integration: **87/87 ناجحة** (51 من المرحلة 1 ما زالت ناجحة + 36 جديدة)
+```
+✓ tests/integration/bookings.test.ts (17 tests)
+✓ tests/integration/tenant-isolation.test.ts (10 tests)
+✓ tests/integration/catalog-payments.test.ts (5 tests)
+✓ tests/integration/auth.test.ts (13 tests)
+✓ tests/integration/rbac-admin.test.ts (8 tests)
+✓ tests/unit/foundation.test.ts (20 tests)
+✓ tests/unit/phase2.test.ts (14 tests)
+Test Files  7 passed (7) · Tests  87 passed (87)
+```
+أبرز ما يُختبر: سباق حجزين متزامنين على نفس الموعد (ينجح واحد فقط)، رفض PostgreSQL المباشر لحجز متداخل، أسباب عدم الأهلية، إعادة التحقق عند التأكيد، الخصوصية قبل/بعد التأكيد، سياسة الإلغاء، انتهاء مهلة القبول، ثبات اللقطات بعد تغيير الأسعار والتغطية، العزل بين العميلات والمنشآت والموظفات، وسائل الدفع (لا تفعيل بلا ربط).
+
+### اختبارات الطفرة (Mutation) — كلها كُشفت
+| الطفرة | النتيجة |
+|---|---|
+| حذف قيد منع التداخل من قاعدة الاختبار | فشل اختباران (السباق + الرفض المباشر). وعند إعادة القيد رفضت PostgreSQL إضافته لوجود حجزين متداخلين أنشأهما اختبار السباق فعلاً — دليل أن القيد هو الضامن الحقيقي |
+| كشف العنوان للمقدمة قبل التأكيد | فشل اختبار مسار الزيارة |
+| إزالة شرط مهلة الإلغاء | فشل اختبار سياسة الإلغاء |
+
+### E2E الحجز (`tests/e2e/booking.mjs`): **11/11 ناجحة** — كلها عبر الواجهة الحقيقية
+```
+PASS  admin adds a city, two districts and a category from the admin panel
+PASS  owner creates a salon; admin approves it
+PASS  owner sets coverage (with travel fee) and adds a service
+PASS  owner adds the provider; she sets her skills, districts and weekly schedule
+PASS  customer adds an address, searches, sees the price breakdown and picks a slot
+PASS  checkout shows all 7 payment methods; only cash is selectable, the rest say why
+PASS  provider sees the district only, accepts, then sees the full address
+PASS  provider runs the visit to completion and records the cash payment
+PASS  customer was notified at each step and leaves a review
+PASS  another customer cannot open the booking
+PASS  admin sees all payment methods (cash switchable, others pending integration) and the live report
+```
+E2E المرحلة 1: **12/12 ما زالت ناجحة**.
+
+### خلل اكتُشف بالاختبار وأُصلح
+- نماذج «إضافة عنوان» و«حذف عنوان» و«تفعيل فئة» كانت تحفظ دون إظهار رسالة نجاح للمستخدم → صارت تُظهر «تم الحفظ».

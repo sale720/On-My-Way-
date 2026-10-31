@@ -128,7 +128,9 @@ describe("booking creation", () => {
     const [slot] = await firstSlot(m);
     const b = await book(m, slot);
     const row = await bookingRow(b.id);
-    const { id: _id, number: _n, createdAt: _c, updatedAt: _u, payments: _p, history: _h, items: _i, ...copy } = row;
+    const copy = Object.fromEntries(
+      Object.entries(row).filter(([k]) => !["id", "number", "createdAt", "updatedAt", "payments", "history", "items"].includes(k)),
+    ) as Omit<typeof row, "id" | "number" | "createdAt" | "updatedAt" | "payments" | "history" | "items">;
     await expect(
       db.booking.create({ data: { ...copy, number: "OMW-DUPLX1", startsAt: new Date(slot.getTime() + 15 * 60_000), endsAt: new Date(slot.getTime() + 75 * 60_000), blockedFrom: new Date(slot.getTime() - 15 * 60_000) } }),
     ).rejects.toThrow(/booking_no_overlap_per_provider|23P01|exclusion/i);

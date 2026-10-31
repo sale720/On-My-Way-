@@ -12,7 +12,7 @@ const ar = {
   nav: { home: "الرئيسية", account: "حسابي", admin: "الإدارة", login: "تسجيل الدخول", logout: "تسجيل الخروج", language: "English" },
   home: {
     intro: "منصة لحجز خدمات التجميل المنزلية وإدارة الصالونات السحابية في المملكة.",
-    phaseNote: "المرحلة الحالية: الأساس التقني (الحسابات، الصلاحيات، المنشآت). الحجز غير متاح بعد.",
+    phaseNote: "النسخة التشغيلية الأولى: الحجز متاح بالدفع نقداً عند الزيارة. وسائل الدفع الإلكترونية ظاهرة وستُفعّل بعد ربط بوابة الدفع.",
     cta: "ابدأ بتسجيل الدخول",
   },
   login: {
@@ -115,7 +115,7 @@ const en: Dictionary = {
   nav: { home: "Home", account: "My account", admin: "Admin", login: "Sign in", logout: "Sign out", language: "العربية" },
   home: {
     intro: "A platform for booking at-home beauty services and running cloud salons in Saudi Arabia.",
-    phaseNote: "Current phase: technical foundation (accounts, permissions, salons). Booking is not available yet.",
+    phaseNote: "First operational release: booking is live with cash on visit. Online payment methods are visible and will be activated once a gateway is connected.",
     cta: "Sign in to start",
   },
   login: {
