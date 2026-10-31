@@ -46,14 +46,21 @@ function startServer() {
       env: serverEnv,
       stdio: ["ignore", "pipe", "pipe"],
     });
+    // Cleared on success so the pending timer does not keep the process alive after the run.
+    const timer = setTimeout(() => reject(new Error("server did not start in 60s")), 60_000);
     const onData = (d) => {
       logBuffer += d.toString();
-      if (/Ready in|started server|Local:/.test(d.toString())) resolve();
+      if (/Ready in|started server|Local:/.test(d.toString())) {
+        clearTimeout(timer);
+        resolve();
+      }
     };
     server.stdout.on("data", onData);
     server.stderr.on("data", (d) => (logBuffer += d.toString()));
-    server.on("exit", (code) => code && reject(new Error(`server exited ${code}`)));
-    setTimeout(() => reject(new Error("server did not start in 60s")), 60_000);
+    server.on("exit", (code) => {
+      clearTimeout(timer);
+      if (code) reject(new Error(`server exited ${code}`));
+    });
   });
 }
 async function stopServer() {

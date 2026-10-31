@@ -55,5 +55,9 @@ PASS  secrets are not written to the server log in clear text
 2. استخراج رمز OTP من السجل التقط أول 6 أرقام من رقم الجوال. أُصلح التعبير النمطي.
 3. `role="alert"` يطابق عنصر إعلان التنقل الداخلي في Next.js؛ قُيّدت المحددات بالنموذج.
 
-### CI
-انظر قسم «نتيجة CI» أدناه (يُحدَّث بعد تشغيل GitHub Actions).
+### نتيجة CI (GitHub Actions)
+- **Run #1** على commit `afb380f` — [الرابط](https://github.com/sale720/On-My-Way-/actions/runs/41205254699): **success**.
+  الخطوات: lint ✓ · typecheck ✓ · unit+integration على PostgreSQL 16 ✓ · build ✓ · E2E ✓ (السجل يُظهر سطور `PASS` الاثنتي عشرة).
+- ملاحظات من سجل Run #1 أُصلحت في الـ commit التالي:
+  1. فحص صحة PostgreSQL كان يتصل بقاعدة `omw` غير الموجودة (ضجيج `FATAL` في السجل، دون أثر على النتيجة) → أُضيف `-d omw_test`.
+  2. سكربت E2E بقي معلّقاً ~57 ثانية بعد انتهاء الاختبارات بسبب مؤقّت لم يُلغَ → أُلغي المؤقّت؛ المدة المحلية الآن 14 ثانية.
