@@ -3,13 +3,22 @@
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-  "forwardPorts": [3000],
+  "forwardPorts": [
+    3000
+  ],
   "portsAttributes": {
-    "3000": { "label": "On My Way", "onAutoForward": "openPreview" }
+    "3000": {
+      "label": "On My Way",
+      "onAutoForward": "notify"
+    }
   },
   "postCreateCommand": "bash .devcontainer/setup.sh",
-  "postAttachCommand": "npm run dev",
   "customizations": {
-    "codespaces": { "openFiles": ["docs/TRY_IT.md"] }
-  }
+    "codespaces": {
+      "openFiles": [
+        "docs/TRY_IT.md"
+      ]
+    }
+  },
+  "postStartCommand": "bash .devcontainer/start.sh"
 }
