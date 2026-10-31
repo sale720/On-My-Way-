@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  PROVIDER
+  ADMIN
+}
+
+enum ProviderStatus {
+  PENDING_REVIEW
+  APPROVED
+  SUSPENDED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  CANCELLED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  name      String?
+  role      Role     @default(CUSTOMER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  provider  ProviderProfile?
+  addresses Address[]
+  bookings  Booking[]        @relation("CustomerBookings")
+  reviews   Review[]
+}
+
+model ProviderProfile {
+  id          String         @id @default(cuid())
+  userId      String         @unique
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName String
+  bio         String?
+  status      ProviderStatus @default(PENDING_REVIEW)
+  serviceArea String[] // مدن/أحياء يخدمها المقدّم
+  ratingAvg   Decimal        @default(0) @db.Decimal(3, 2)
+  ratingCount Int            @default(0)
+  createdAt   DateTime       @default(now())
+
+  services     Service[]
+  availability Availability[]
+  bookings     Booking[]
+  reviews      Review[]
+}
+
+// قابل للتوسّع لقطاعات أخرى غير الصالونات
+model Category {
+  id       String     @id @default(cuid())
+  slug     String     @unique
+  nameAr   String
+  nameEn   String?
+  parentId String?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  services Service[]
+}
+
+model Service {
+  id              String          @id @default(cuid())
+  providerId      String
+  provider        ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  categoryId      String
+  category        Category        @relation(fields: [categoryId], references: [id])
+  name            String
+  description     String?
+  priceHalalas    Int // السعر بأصغر وحدة لتجنّب أخطاء الكسور
+  durationMinutes Int
+  isActive        Boolean         @default(true)
+  bookingItems    BookingItem[]
+
+  @@index([providerId])
+  @@index([categoryId])
+}
+
+// توفّر أسبوعي متكرّر (0 = الأحد)
+model Availability {
+  id          String          @id @default(cuid())
+  providerId  String
+  provider    ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  weekday     Int
+  startMinute Int // دقائق من بداية اليوم
+  endMinute   Int
+
+  @@index([providerId, weekday])
+}
+
+model Address {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String?
+  city      String
+  district  String
+  details   String
+  latitude  Float?
+  longitude Float?
+  bookings  Booking[]
+}
+
+model Booking {
+  id           String          @id @default(cuid())
+  customerId   String
+  customer     User            @relation("CustomerBookings", fields: [customerId], references: [id])
+  providerId   String
+  provider     ProviderProfile @relation(fields: [providerId], references: [id])
+  addressId    String
+  address      Address         @relation(fields: [addressId], references: [id])
+  status       BookingStatus   @default(PENDING)
+  startsAt     DateTime
+  endsAt       DateTime
+  totalHalalas Int
+  currency     String          @default("SAR")
+  notes        String?
+  cancelReason String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  items  BookingItem[]
+  review Review?
+
+  @@index([providerId, startsAt])
+  @@index([customerId])
+}
+
+// snapshot للسعر والمدة وقت الحجز
+model BookingItem {
+  id              String  @id @default(cuid())
+  bookingId       String
+  booking         Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  serviceId       String
+  service         Service @relation(fields: [serviceId], references: [id])
+  nameSnapshot    String
+  priceHalalas    Int
+  durationMinutes Int
+}
+
+model Review {
+  id         String          @id @default(cuid())
+  bookingId  String          @unique // تقييم واحد لكل حجز
+  booking    Booking         @relation(fields: [bookingId], references: [id])
+  customerId String
+  customer   User            @relation(fields: [customerId], references: [id])
+  providerId String
+  provider   ProviderProfile @relation(fields: [providerId], references: [id])
+  rating     Int // 1..5 (يُتحقق منه في طبقة التطبيق)
+  comment    String?
+  createdAt  DateTime        @default(now())
+
+  @@index([providerId])
+}
