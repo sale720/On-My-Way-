@@ -1,3 +1,6 @@
+// Phase 1 — Technical foundation: identity, sessions, RBAC, tenant (salon) isolation, audit.
+// Marketplace/booking models are introduced in Phase 2 (see docs/DECISIONS.md, D-004).
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,161 +10,143 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  CUSTOMER
-  PROVIDER
-  ADMIN
-}
-
-enum ProviderStatus {
-  PENDING_REVIEW
-  APPROVED
+enum UserStatus {
+  ACTIVE
   SUSPENDED
 }
 
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  REJECTED
-  CANCELLED
-  IN_PROGRESS
-  COMPLETED
+enum Locale {
+  ar
+  en
+}
+
+// Platform-wide roles. Salon-scoped roles live on SalonMembership.
+enum PlatformRole {
+  CUSTOMER
+  PROVIDER
+  SUPPORT_AGENT
+  PLATFORM_ADMIN
+}
+
+enum SalonStatus {
+  PENDING_REVIEW
+  ACTIVE
+  SUSPENDED
+}
+
+enum SalonRole {
+  OWNER
+  MANAGER
+  STAFF
+}
+
+enum MembershipStatus {
+  ACTIVE
+  DISABLED
 }
 
 model User {
-  id        String   @id @default(cuid())
-  phone     String   @unique
-  name      String?
-  role      Role     @default(CUSTOMER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String     @id @default(cuid())
+  phone       String     @unique // E.164, e.g. +9665XXXXXXXX
+  name        String?
+  locale      Locale     @default(ar)
+  status      UserStatus @default(ACTIVE)
+  lastLoginAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  provider  ProviderProfile?
-  addresses Address[]
-  bookings  Booking[]        @relation("CustomerBookings")
-  reviews   Review[]
+  roles       PlatformRoleAssignment[] @relation("RoleHolder")
+  rolesGiven  PlatformRoleAssignment[] @relation("RoleGranter")
+  sessions    Session[]
+  memberships SalonMembership[]
+  auditLogs   AuditLog[]
+  salonsMade  Salon[]
 }
 
-model ProviderProfile {
-  id          String         @id @default(cuid())
-  userId      String         @unique
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  displayName String
-  bio         String?
-  status      ProviderStatus @default(PENDING_REVIEW)
-  serviceArea String[] // مدن/أحياء يخدمها المقدّم
-  ratingAvg   Decimal        @default(0) @db.Decimal(3, 2)
-  ratingCount Int            @default(0)
-  createdAt   DateTime       @default(now())
+model PlatformRoleAssignment {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation("RoleHolder", fields: [userId], references: [id], onDelete: Cascade)
+  role        PlatformRole
+  grantedById String?
+  grantedBy   User?        @relation("RoleGranter", fields: [grantedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
 
-  services     Service[]
-  availability Availability[]
-  bookings     Booking[]
-  reviews      Review[]
+  @@unique([userId, role])
 }
 
-// قابل للتوسّع لقطاعات أخرى غير الصالونات
-model Category {
-  id       String     @id @default(cuid())
-  slug     String     @unique
-  nameAr   String
-  nameEn   String?
-  parentId String?
-  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
-  children Category[] @relation("CategoryTree")
-  services Service[]
+model Session {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique // sha256 of the opaque cookie token; raw token is never stored
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
-model Service {
-  id              String          @id @default(cuid())
-  providerId      String
-  provider        ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  categoryId      String
-  category        Category        @relation(fields: [categoryId], references: [id])
-  name            String
-  description     String?
-  priceHalalas    Int // السعر بأصغر وحدة لتجنّب أخطاء الكسور
-  durationMinutes Int
-  isActive        Boolean         @default(true)
-  bookingItems    BookingItem[]
+model OtpChallenge {
+  id         String    @id @default(cuid())
+  phone      String
+  codeHash   String // HMAC-SHA256(AUTH_SECRET, phone:code)
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  requestIp  String?
+  createdAt  DateTime  @default(now())
 
-  @@index([providerId])
-  @@index([categoryId])
+  @@index([phone, createdAt])
+  @@index([requestIp, createdAt])
 }
 
-// توفّر أسبوعي متكرّر (0 = الأحد)
-model Availability {
-  id          String          @id @default(cuid())
-  providerId  String
-  provider    ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  weekday     Int
-  startMinute Int // دقائق من بداية اليوم
-  endMinute   Int
+model Salon {
+  id          String      @id @default(cuid())
+  slug        String      @unique
+  name        String
+  status      SalonStatus @default(PENDING_REVIEW)
+  createdById String?
+  createdBy   User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
-  @@index([providerId, weekday])
+  memberships SalonMembership[]
+  auditLogs   AuditLog[]
 }
 
-model Address {
-  id        String    @id @default(cuid())
+model SalonMembership {
+  id        String           @id @default(cuid())
+  salonId   String
+  salon     Salon            @relation(fields: [salonId], references: [id], onDelete: Cascade)
   userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  label     String?
-  city      String
-  district  String
-  details   String
-  latitude  Float?
-  longitude Float?
-  bookings  Booking[]
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      SalonRole
+  status    MembershipStatus @default(ACTIVE)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([salonId, userId])
+  @@index([userId])
 }
 
-model Booking {
-  id           String          @id @default(cuid())
-  customerId   String
-  customer     User            @relation("CustomerBookings", fields: [customerId], references: [id])
-  providerId   String
-  provider     ProviderProfile @relation(fields: [providerId], references: [id])
-  addressId    String
-  address      Address         @relation(fields: [addressId], references: [id])
-  status       BookingStatus   @default(PENDING)
-  startsAt     DateTime
-  endsAt       DateTime
-  totalHalalas Int
-  currency     String          @default("SAR")
-  notes        String?
-  cancelReason String?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+// Append-only record of sensitive actions (who, what, when, why).
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String? // null = system (e.g. CLI bootstrap)
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  targetType String
+  targetId   String
+  salonId    String?
+  salon      Salon?   @relation(fields: [salonId], references: [id], onDelete: SetNull)
+  reason     String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
 
-  items  BookingItem[]
-  review Review?
-
-  @@index([providerId, startsAt])
-  @@index([customerId])
-}
-
-// snapshot للسعر والمدة وقت الحجز
-model BookingItem {
-  id              String  @id @default(cuid())
-  bookingId       String
-  booking         Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  serviceId       String
-  service         Service @relation(fields: [serviceId], references: [id])
-  nameSnapshot    String
-  priceHalalas    Int
-  durationMinutes Int
-}
-
-model Review {
-  id         String          @id @default(cuid())
-  bookingId  String          @unique // تقييم واحد لكل حجز
-  booking    Booking         @relation(fields: [bookingId], references: [id])
-  customerId String
-  customer   User            @relation(fields: [customerId], references: [id])
-  providerId String
-  provider   ProviderProfile @relation(fields: [providerId], references: [id])
-  rating     Int // 1..5 (يُتحقق منه في طبقة التطبيق)
-  comment    String?
-  createdAt  DateTime        @default(now())
-
-  @@index([providerId])
+  @@index([targetType, targetId])
+  @@index([salonId, createdAt])
+  @@index([createdAt])
 }

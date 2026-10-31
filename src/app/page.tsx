@@ -1,14 +1,20 @@
-export default function Home() {
+import Link from "next/link";
+import { getCurrentUser, getDictionary } from "@/server/web";
+
+export default async function Home() {
+  const [dict, user] = await Promise.all([getDictionary(), getCurrentUser()]);
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center gap-6 px-4 py-16">
-      <h1 className="text-4xl font-bold">On My Way — في الطريق</h1>
-      <p className="text-lg opacity-80">
-        احجزي خدمات الصالون في منزلك: اختاري الخدمة، حدّدي الموعد، وقيّمي التجربة.
-      </p>
-      <div className="flex flex-wrap gap-3">
-        <span className="rounded-full border px-4 py-2 text-sm">للعميلات: الحجز قريباً</span>
-        <span className="rounded-full border px-4 py-2 text-sm">لمقدّمات الخدمة: التسجيل قريباً</span>
-      </div>
-    </main>
+    <section className="flex flex-col gap-6 py-10">
+      <h1 className="text-4xl font-bold">
+        {dict.appName} — {dict.tagline}
+      </h1>
+      <p className="text-lg muted">{dict.home.intro}</p>
+      <p className="card text-sm">{dict.home.phaseNote}</p>
+      {!user && (
+        <Link href="/login" className="btn self-start">
+          {dict.home.cta}
+        </Link>
+      )}
+    </section>
   );
 }
