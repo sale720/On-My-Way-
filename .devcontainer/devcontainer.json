@@ -1,0 +1,15 @@
+{
+  "name": "On My Way — بيئة التجربة",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": { "label": "On My Way", "onAutoForward": "openPreview" }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postAttachCommand": "npm run dev",
+  "customizations": {
+    "codespaces": { "openFiles": ["docs/TRY_IT.md"] }
+  }
+}

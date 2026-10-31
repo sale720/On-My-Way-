@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --muted: #6b6b6b;
+  --border: #d9d9d9;
+  --accent: #8a2c5b;
+  --accent-fg: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-arabic);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0f0f10;
+    --foreground: #ededed;
+    --muted: #a3a3a3;
+    --border: #333;
+    --accent: #d77aa8;
+    --accent-fg: #1a0b12;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-arabic), system-ui, sans-serif;
+}
+
+.input {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  background: transparent;
+  min-width: 0;
+}
+.btn {
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.9rem;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 500;
+}
+.btn:disabled {
+  opacity: 0.6;
+}
+.btn-ghost {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.8rem;
+}
+.card {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+.muted {
+  color: var(--muted);
+}
+table.grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+table.grid-table th,
+table.grid-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem;
+  text-align: start;
+  vertical-align: top;
+}

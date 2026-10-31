@@ -1,0 +1,42 @@
+# الأدوار والصلاحيات (المنفّذ فعلياً في المرحلة 1)
+
+المصدر الوحيد للحقيقة: `src/server/rbac/permissions.ts`. التنفيذ على الخادم في `src/server/rbac/authorize.ts`.
+
+## أدوار المنصة (`PlatformRoleAssignment`)
+| الصلاحية | CUSTOMER | PROVIDER | SUPPORT_AGENT | PLATFORM_ADMIN |
+|---|:-:|:-:|:-:|:-:|
+| customer.profile.manage | ✓ | ✓ | ✓ | ✓ |
+| salon.create | ✓ | ✓ | – | ✓ |
+| platform.users.read | – | – | ✓ (أرقام مموّهة) | ✓ |
+| platform.users.manage | – | – | – | ✓ |
+| platform.roles.manage | – | – | – | ✓ |
+| platform.salons.read | – | – | ✓ (قراءة فقط) | ✓ |
+| platform.salons.manage | – | – | – | ✓ |
+| platform.audit.read | – | – | – | ✓ |
+
+كل مستخدم جديد يحصل على `CUSTOMER` تلقائياً.
+
+## أدوار المنشأة (`SalonMembership.role`)
+| الصلاحية | OWNER | MANAGER | STAFF |
+|---|:-:|:-:|:-:|
+| salon.profile.read | ✓ | ✓ | ✓ |
+| salon.profile.manage | ✓ | – | – |
+| salon.members.read | ✓ | ✓ | – |
+| salon.members.manage | ✓ | ✓ (لا يمنح/يعدّل OWNER) | – |
+
+## قواعد إضافية مُنفّذة ومختبرة
+- غير العضو (أو العضو المعطّل) يحصل على `NOT_FOUND` — لا يُكشف وجود المنشأة.
+- معرّف عضوية من منشأة أخرى لا يمكن تعديله عبر منشأتك (الاستعلام مقيّد بـ `salonId`).
+- لا يمكن تعطيل أو تخفيض آخر مالكة نشطة (`LAST_OWNER`).
+- المدير لا يستطيع تعليق نفسه أو سحب دور `PLATFORM_ADMIN` من نفسه.
+- تعليق مستخدم يلغي جميع جلساته فوراً.
+- كل تغيير حالة/دور يتطلب سبباً (3 أحرف على الأقل) ويُسجَّل في `AuditLog`.
+
+## إضافات المرحلة 2
+**منصة:** `platform.catalog.manage`، `platform.geo.manage`، `platform.settings.manage`، `platform.payments.manage`، `platform.bookings.manage`، `platform.reports.read` (مدير المنصة)؛ `platform.bookings.read` (المدير والدعم)؛ `customer.bookings.manage` (الجميع).
+
+**منشأة:** `salon.services.manage`، `salon.coverage.manage`، `salon.staff.manage`، `salon.bookings.read`، `salon.bookings.manage` (مالكة ومديرة)؛ `salon.settings.manage`، `salon.payments.manage` (مالكة فقط).
+
+**مقدمة الخدمة (STAFF):** تدير جدولها وخدماتها وأحياءها **بنفسها فقط** (`requireSelfOrSalonPermission`)، وترى وتنفّذ الحجوزات المسندة إليها فقط.
+
+**الدعم:** يقرأ الحجوزات لمعالجة الحالات، ولا يغيّر حالتها ولا مدفوعاتها.

@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: omw
+          POSTGRES_PASSWORD: omw_ci_only
+          POSTGRES_DB: omw_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U omw -d omw_test" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Create isolated test environment file (CI-only values, not secrets)
+        run: |
+          cat > .env.test <<'ENV'
+          APP_ENV=test
+          DATABASE_URL="postgresql://omw:omw_ci_only@localhost:5432/omw_test?schema=public"
+          AUTH_SECRET="ci-only-secret-0123456789abcdef0123456789"
+          SMS_PROVIDER=memory
+          PAYMENT_MODE=sandbox
+          ENV
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Unit + integration tests (real PostgreSQL)
+        run: npm test
+      - name: Build
+        run: npm run build
+        env:
+          APP_ENV: test
+      - name: Install Playwright Chromium (CI only)
+        run: npm i --no-save playwright@1.55.0 && npx playwright install --with-deps chromium
+      - name: End-to-end acceptance
+        run: npm run test:e2e
